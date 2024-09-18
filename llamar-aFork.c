@@ -137,12 +137,6 @@ int main(int argc, char *argv[]) {
     return 0;
 }
  
-/***
-fin_de_transmision: rutina de tratamiento de la señal SIGINT. Al pulsar Ctrl+C
-entramos en esta rutina, que se encarga de enviar el mensaje "corto\n" al usuario
-con el que estamos hablando.
-***/
- 
 void fin_de_transmision(int sig) {
     sprintf(mensaje, "corto\n");
     write(fifo_12, mensaje, strlen(mensaje) + 1);
