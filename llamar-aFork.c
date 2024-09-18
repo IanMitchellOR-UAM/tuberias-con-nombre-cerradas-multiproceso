@@ -1,16 +1,18 @@
-#include <stdio.h>
-#include <stdlib.h>     // Para exit() y getenv()
-#include <string.h>
-#include <signal.h>
 #include <fcntl.h>
-#include <sys/types.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>  // Para exit() y getenv()
+#include <string.h>
+#include <sys/select.h>  // Para select()
 #include <sys/stat.h>
-#include <unistd.h>     // Para read(), write(), close()
-#include <sys/select.h> // Para select()
+#include <sys/types.h>
+#include <unistd.h>  // Para read(), write(), close()
+
 #include "utmp.h"
 
 #define MAX 256
-#define EQ(str1, str2) (strcmp((str1), (str2)) == 0)  // Macro para comparar dos cadenas
+#define EQ(str1, str2) \
+    (strcmp((str1), (str2)) == 0)  // Macro para comparar dos cadenas
 
 int fifo_12[MAX], fifo_21[MAX];
 char nombre_fifo_12[MAX][MAX], nombre_fifo_21[MAX][MAX];
@@ -26,7 +28,8 @@ int main(int argc, char *argv[]) {
 
     // Análisis de los argumentos de la línea de órdenes
     if (argc < 2) {
-        fprintf(stderr, "Forma de uso: %s usuario1 usuario2 ... usuarioN\n", argv[0]);
+        fprintf(stderr, "Forma de uso: %s usuario1 usuario2 ... usuarioN\n",
+                argv[0]);
         exit(-1);
     }
 
@@ -45,7 +48,8 @@ int main(int argc, char *argv[]) {
 
     // Consultamos si los usuarios han iniciado sesión
     for (int i = 1; i < argc; i++) {
-        while ((utmp = getutent()) != NULL && strncmp(utmp->ut_user, argv[i], sizeof(utmp->ut_user)) != 0);
+        while ((utmp = getutent()) != NULL &&
+               strncmp(utmp->ut_user, argv[i], sizeof(utmp->ut_user)) != 0);
 
         if (utmp == NULL) {
             printf("EL USUARIO %s NO HA INICIADO SESIÓN.\n", argv[i]);
@@ -53,21 +57,21 @@ int main(int argc, char *argv[]) {
         }
 
         // Formación de los nombres de las tuberías
-        sprintf(nombre_fifo_12[i-1], "/tmp/%s_%s", logname, argv[i]);
-        sprintf(nombre_fifo_21[i-1], "/tmp/%s_%s", argv[i], logname);
+        sprintf(nombre_fifo_12[i - 1], "/tmp/%s_%s", logname, argv[i]);
+        sprintf(nombre_fifo_21[i - 1], "/tmp/%s_%s", argv[i], logname);
 
         // Creación y apertura de las tuberías
-        unlink(nombre_fifo_12[i-1]);
-        unlink(nombre_fifo_21[i-1]);
+        unlink(nombre_fifo_12[i - 1]);
+        unlink(nombre_fifo_21[i - 1]);
         umask(~0666);
 
-        if (mkfifo(nombre_fifo_12[i-1], 0666) == -1) {
-            perror(nombre_fifo_12[i-1]);
+        if (mkfifo(nombre_fifo_12[i - 1], 0666) == -1) {
+            perror(nombre_fifo_12[i - 1]);
             exit(-1);
         }
 
-        if (mkfifo(nombre_fifo_21[i-1], 0666) == -1) {
-            perror(nombre_fifo_21[i-1]);
+        if (mkfifo(nombre_fifo_21[i - 1], 0666) == -1) {
+            perror(nombre_fifo_21[i - 1]);
             exit(-1);
         }
 
@@ -79,9 +83,9 @@ int main(int argc, char *argv[]) {
         }
 
         sprintf(mensaje,
-            "\n\t\tLLAMADA PROCEDENTE DEL USUARIO %s\07\07\07\n"
-            "\t\tRESPONDER ESCRIBIENDO: responder-aFork %s\n\n",
-            logname, logname);
+                "\n\t\tLLAMADA PROCEDENTE DEL USUARIO %s\07\07\07\n"
+                "\t\tRESPONDER ESCRIBIENDO: responder-aFork %s\n\n",
+                logname, logname);
         write(tty, mensaje, strlen(mensaje) + 1);
         close(tty);
     }
@@ -90,7 +94,8 @@ int main(int argc, char *argv[]) {
 
     // Apertura de las tuberías
     for (int i = 0; i < num_usuarios; i++) {
-        if ((fifo_12[i] = open(nombre_fifo_12[i], O_WRONLY)) == -1 || (fifo_21[i] = open(nombre_fifo_21[i], O_RDONLY)) == -1) {
+        if ((fifo_12[i] = open(nombre_fifo_12[i], O_WRONLY)) == -1 ||
+            (fifo_21[i] = open(nombre_fifo_21[i], O_RDONLY)) == -1) {
             perror("Error al abrir tuberías");
             exit(-1);
         }
@@ -134,7 +139,7 @@ int main(int argc, char *argv[]) {
             for (int i = 0; i < num_usuarios; i++) {
                 if (FD_ISSET(fifo_21[i], &readfds)) {
                     read(fifo_21[i], mensaje, MAX);
-                    printf("Mensaje de %s: %s", argv[i+1], mensaje);
+                    printf("Mensaje de %s: %s", argv[i + 1], mensaje);
                 }
             }
         } while (!EQ(mensaje, "cambio\n") && !EQ(mensaje, "corto\n"));
