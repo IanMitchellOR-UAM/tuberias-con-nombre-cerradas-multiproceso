@@ -1,11 +1,11 @@
 #include <stdio.h>
-#include <stdlib.h>   // Se incluye para la función exit() y getenv()
-#include <string.h>   // Se incluye para la función strcmp()
+#include <stdlib.h>
+#include <string.h> 
 #include <signal.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>   // Se incluye para las funciones read(), write() y close()
+#include <unistd.h>
  
 #define MAX 256
  
@@ -94,12 +94,7 @@ int main(int argc, char *argv[]) {
  
     return 0;
 }
- 
-/***
-fin_de_transmision: rutina de tratamiento de la señal SIGINT. Al pulsar Ctrl+C
-entramos en esta rutina, que se encarga de enviar el mensaje "corto\n" al usuario
-con el que estamos hablando.
-***/
+
 void fin_de_transmision(int sig) {
     sprintf(mensaje, "corto\n");
     write(fifo_21, mensaje, strlen(mensaje) + 1);
