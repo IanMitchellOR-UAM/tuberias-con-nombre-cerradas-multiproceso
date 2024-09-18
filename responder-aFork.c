@@ -1,13 +1,3 @@
-/***
-sudo addusur nombre_usuario
-El programa exige que la variable de entorno LOGNAME estÃ© correctamente
-inicializada con el nombre del usuario. Esto se puede conseguir incluyendo las dos
-lÃ­neas siguientes en el fichero .profile de configuraciÃ³n de nuestro intÃ©rprete de
-Ã³rdenes:
-LOGNAME='logname'
-export LOGNAME
-***/
- 
 #include <stdio.h>
 #include <stdlib.h>   // Se incluye para la función exit() y getenv()
 #include <string.h>   // Se incluye para la función strcmp()
