@@ -97,7 +97,6 @@ int main(int argc, char *argv[]) {
             printf("<== ");
             fgets(mensaje, sizeof(mensaje), stdin);
 
-            // Evitar enviar el mensaje "corto" por las tuberías
             if (!EQ(mensaje, "corto\n")) {
                 for (int i = 0; i < num_usuarios; i++) {
                     write(fifo_12[i], mensaje, strlen(mensaje) + 1);
@@ -105,6 +104,8 @@ int main(int argc, char *argv[]) {
             }
         } while (!EQ(mensaje, "corto\n"));
         
+        // Al escribir "corto", también notificar al proceso padre
+        kill(getppid(), SIGINT);
         exit(0);  // El proceso hijo termina aquí
     } else {  // Proceso padre: Recepción de mensajes
         fd_set readfds;
