@@ -6,104 +6,83 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h> // Para read(), write(), close()
-#include <sys/select.h> // Para select()
 
 #define MAX 256
-#define EQ(str1, str2) (strcmp((str1), (str2)) == 0) // Macro para comparar dos cadenas
+#define EQ(str1, str2) (strcmp((str1), (str2)) == 0)  // Macro para comparar dos cadenas
 
-int fifo_12[MAX], fifo_21[MAX];
-char nombre_fifo_12[MAX][MAX], nombre_fifo_21[MAX][MAX];
+int fifo_12, fifo_21;
+char nombre_fifo_12[MAX], nombre_fifo_21[MAX];
 char mensaje[MAX];
-int num_usuarios;
 
 void fin_de_transmision(int sig);
 
 int main(int argc, char *argv[]) {
     char *logname;
 
-    if (argc < 2) {
-        fprintf(stderr, "Forma de uso: %s usuario1 usuario2 ... usuarioN\n", argv[0]);
+    // Análisis de los argumentos de la línea de órdenes
+    if (argc != 2) {
+        fprintf(stderr, "Forma de uso: %s usuario\n", argv[0]);
         exit(-1);
     }
 
-    num_usuarios = argc - 1;
+    // Lectura del nombre del usuario
     logname = getenv("LOGNAME");
 
-    for (int i = 1; i < argc; i++) {
-        if (EQ(logname, argv[i])) {
-            fprintf(stderr, "Comunicación con uno mismo no permitida\n");
-            exit(0);
-        }
+    // Comprobación para que un usuario no se responda a sí mismo
+    if (EQ(logname, argv[1])) {
+        fprintf(stderr, "Comunicación con uno mismo no permitida\n");
+        exit(0);
     }
 
-    for (int i = 1; i < argc; i++) {
-        sprintf(nombre_fifo_12[i-1], "/tmp/%s_%s", argv[i], logname);
-        sprintf(nombre_fifo_21[i-1], "/tmp/%s_%s", logname, argv[i]);
+    // Formación del nombre de las tuberías de comunicación
+    sprintf(nombre_fifo_12, "/tmp/%s_%s", argv[1], logname);
+    sprintf(nombre_fifo_21, "/tmp/%s_%s", logname, argv[1]);
 
-        if ((fifo_12[i-1] = open(nombre_fifo_12[i-1], O_RDONLY)) == -1 || (fifo_21[i-1] = open(nombre_fifo_21[i-1], O_WRONLY)) == -1) {
-            perror("Error al abrir tuberías");
-            exit(-1);
-        }
+    // Apertura de las tuberías
+    if ((fifo_12 = open(nombre_fifo_12, O_RDONLY)) == -1 || (fifo_21 = open(nombre_fifo_21, O_WRONLY)) == -1) {
+        perror(nombre_fifo_21);
+        exit(-1);
     }
 
+    // Armamos el manejador de la señal SIGINT
     signal(SIGINT, fin_de_transmision);
 
     pid_t pid;
-    if ((pid = fork()) == 0) {  // Proceso hijo: Recepción de mensajes
-        fd_set readfds;
-        int max_fd = 0;
-
-        for (int i = 0; i < num_usuarios; i++) {
-            if (fifo_12[i] > max_fd) {
-                max_fd = fifo_12[i];
-            }
-        }
-
-        do {
-            FD_ZERO(&readfds);
-            for (int i = 0; i < num_usuarios; i++) {
-                FD_SET(fifo_12[i], &readfds);
-            }
-
-            select(max_fd + 1, &readfds, NULL, NULL, NULL);
-
-            for (int i = 0; i < num_usuarios; i++) {
-                if (FD_ISSET(fifo_12[i], &readfds)) {
-                    read(fifo_12[i], mensaje, MAX);
-                    if (!EQ(mensaje, "corto\n")) {
-                        printf("Mensaje de %s: %s", argv[i+1], mensaje);
-                    }
-                }
-            }
-        } while (!EQ(mensaje, "corto\n"));
-        
-        kill(getppid(), SIGINT);
-        exit(0);  // Termina el proceso hijo
-    } else {  // Proceso padre: Envío de mensajes
+    if ((pid = fork()) == 0) {  // proceso hijo
+        // Bucle de recepción de mensajes
         do {
             printf("==> ");
-            fgets(mensaje, sizeof(mensaje), stdin);
-
-            if (!EQ(mensaje, "corto\n")) {
-                for (int i = 0; i < num_usuarios; i++) {
-                    write(fifo_21[i], mensaje, strlen(mensaje) + 1);
-                }
-            }
+            fflush(stdout);
+            read(fifo_12, mensaje, MAX);
+            printf("%s", mensaje);
         } while (!EQ(mensaje, "corto\n"));
+    } else if (pid > 0) {  // proceso padre
+        // Bucle de envío de mensajes
+        do {
+            printf("<== ");
+            fgets(mensaje, sizeof(mensaje), stdin);
+            write(fifo_21, mensaje, strlen(mensaje) + 1);
+        } while (!EQ(mensaje, "cambio\n") && !EQ(mensaje, "corto\n"));
+    } else {
+        perror("Error al crear el proceso hijo");
+        exit(-1);
     }
 
     printf("FIN DE TRANSMISIÓN.\n");
-    fin_de_transmision(0);
-    return 0;
+    close(fifo_12);
+    close(fifo_21);
+    unlink(nombre_fifo_12);  // Elimina la tubería
+    unlink(nombre_fifo_21);  // Elimina la tubería
+    exit(0);
 }
 
 void fin_de_transmision(int sig) {
     sprintf(mensaje, "corto\n");
-    for (int i = 0; i < num_usuarios; i++) {
-        write(fifo_21[i], mensaje, strlen(mensaje) + 1);
-        close(fifo_12[i]);
-        close(fifo_21[i]);
-    }
+    write(fifo_21, mensaje, strlen(mensaje) + 1);
     printf("FIN DE TRANSMISIÓN.\n");
+    close(fifo_12);
+    close(fifo_21);
+    unlink(nombre_fifo_12);  // Elimina la tubería
+    unlink(nombre_fifo_21);  // Elimina la tubería
     exit(0);
 }
